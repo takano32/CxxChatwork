@@ -1,7 +1,9 @@
 .PHONY: help configure build run rebuild clean test-webhook test-challenge test-uri
 
+LISTEN ?=
+
 BUILD_DIR ?= build
-PORT ?= 8080
+PORT ?= 48080
 TARGET := cxx_chatwork
 BINARY := $(BUILD_DIR)/$(TARGET)
 
@@ -18,7 +20,7 @@ help:
 		'  make test-uri        POST a Slack message with multiple URLs to the running server' \
 		'' \
 		'Variables:' \
-		'  PORT=18080           Port used by run and test targets' \
+		'  PORT=48080           Port used by run and test targets' \
 		'  BUILD_DIR=build      CMake build directory'
 
 configure:
@@ -28,7 +30,7 @@ build: configure
 	cmake --build $(BUILD_DIR)
 
 run: build
-	CXX_CHATWORK_PORT=$(PORT) $(BINARY)
+	CXX_CHATWORK_PORT=$(PORT) CXX_CHATWORK_LISTEN=$(LISTEN) $(BINARY)
 
 rebuild: clean build
 
@@ -38,7 +40,7 @@ clean:
 test-webhook:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","text":"PR を確認してください https://github.com/org/repo/pull/1"}}'
+		--data '{"event":{"type":"message","text":"PR を確認してください https://github.com/takano32/brevaluck/pulls"}}'
 
 test-challenge:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
@@ -48,4 +50,4 @@ test-challenge:
 test-uri:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","text":"参考: https://example.com/docs と https://github.com/org/repo を見てください。"}}'
+		--data '{"event":{"type":"message","text":"参考: https://github.com/takano32/brevaluck/ と https://developer.hatena.ne.jp/ を見てください。"}}'

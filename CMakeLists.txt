@@ -12,6 +12,8 @@ add_executable(cxx_chatwork
     src/server.cpp
     src/uri.cpp
     src/hatena_client.cpp
+    src/hatena_bookmark_client.cpp
+    src/oauth.cpp
 )
 
 target_link_libraries(cxx_chatwork PRIVATE OpenSSL::Crypto CURL::libcurl)

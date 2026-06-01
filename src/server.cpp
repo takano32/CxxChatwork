@@ -20,23 +20,6 @@ void handle_signal(int) {
     keep_running = 0;
 }
 
-void handle_client(int client_fd) {
-    const std::string request = read_http_request(client_fd);
-    const std::string_view body = http_body(request);
-
-    if (const auto challenge = find_json_string_value(body, "challenge")) {
-        respond_ok(client_fd, *challenge);
-        return;
-    }
-
-    const auto source = slack_message_text(body).value_or(std::string(body));
-    for (const auto& uri : URI::extract(source)) {
-        std::cout << uri << "\n";
-    }
-
-    respond_ok(client_fd);
-}
-
 } // namespace
 
 void install_signal_handlers() {
@@ -50,7 +33,10 @@ void install_signal_handlers() {
     }
 }
 
-Server::Server(std::uint16_t port) {
+Server::Server(std::vector<std::unique_ptr<HatenaClient>> clients,
+               const std::string& listen_address,
+               std::uint16_t listen_port)
+    : _clients(std::move(clients)) {
     Socket s(::socket(AF_INET, SOCK_STREAM, 0));
     if (s.get() < 0) {
         throw std::runtime_error(std::string("socket failed: ") + std::strerror(errno));
@@ -63,8 +49,10 @@ Server::Server(std::uint16_t port) {
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = htons(port);
+    if (::inet_pton(AF_INET, listen_address.c_str(), &address.sin_addr) != 1) {
+        throw std::runtime_error("invalid listen address: " + listen_address);
+    }
+    address.sin_port = htons(listen_port);
 
     if (::bind(s.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
         throw std::runtime_error(std::string("bind failed: ") + std::strerror(errno));
@@ -74,14 +62,33 @@ Server::Server(std::uint16_t port) {
         throw std::runtime_error(std::string("listen failed: ") + std::strerror(errno));
     }
 
-    socket_ = std::move(s);
+    _socket = std::move(s);
+}
+
+void Server::handle_client(int client_fd) {
+    const std::string request = read_http_request(client_fd);
+    const std::string_view body = http_body(request);
+
+    if (const auto challenge = find_json_string_value(body, "challenge")) {
+        respond_ok(client_fd, *challenge);
+        return;
+    }
+
+    const auto source = slack_message_text(body).value_or(std::string(body));
+    for (const auto& uri : URI::extract(source)) {
+        for (const auto& client : _clients) {
+            client->process(uri);
+        }
+    }
+
+    respond_ok(client_fd);
 }
 
 void Server::run() {
     while (keep_running) {
         sockaddr_in client_address{};
         socklen_t client_size = sizeof(client_address);
-        Socket client(::accept(socket_.get(), reinterpret_cast<sockaddr*>(&client_address), &client_size));
+        Socket client(::accept(_socket.get(), reinterpret_cast<sockaddr*>(&client_address), &client_size));
         if (client.get() < 0) {
             if (errno == EINTR) {
                 continue;

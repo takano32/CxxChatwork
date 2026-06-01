@@ -1,9 +1,9 @@
 # CxxChatwork
 
 CxxChatwork は、C++23 で実装した小さな Slack Webhook 受信サーバーです。
-Slack から HTTP POST で送られてきた JSON payload を受け取り、メッセージ本文に含まれる URL を1行ずつ標準出力に表示します。
+Slack から HTTP POST で送られてきた JSON payload を受け取り、メッセージ本文に含まれる URL を登録済みのクライアントで処理します。
 
-また、はてなブックマーク REST API クライアントを内蔵しており、OAuth 1.0a 認証とブックマークの追加・更新を行えます。
+標準では `HatenaBookmarkClient` が有効になっており、抽出した URL をはてなブックマークに追加・更新します。
 
 ## 必要なもの
 
@@ -31,27 +31,32 @@ cmake --build build
 
 ## 起動方法
 
-使用するポート番号は環境変数 `CXX_CHATWORK_PORT` で指定します。
+起動前に以下の環境変数を設定してください。
 
-Makefile 経由で起動する場合は、`PORT` にポート番号を指定します。
+| 環境変数 | 必須 | 説明 |
+| --- | --- | --- |
+| `CXX_CHATWORK_PORT` | ✓ | サーバーの待受ポート番号 (1–65535) |
+| `CXX_CHATWORK_LISTEN` | — | 待受アドレス。省略時は `0.0.0.0` |
+| `HATENA_CONSUMER_KEY` | ✓ | はてな OAuth の consumer key |
+| `HATENA_CONSUMER_SECRET` | ✓ | はてな OAuth の consumer secret |
+
+起動時に OAuth 認証フローが始まります。表示された URL をブラウザで開いてアプリを認可し、発行された PIN を入力してください。
 
 ```sh
-make run PORT=8080
+make run PORT=48080
+# => Authorize at: https://www.hatena.com/oauth/authorize?oauth_token=...
+# => Enter PIN: xxxxxx
+# => Listening on 0.0.0.0:48080
 ```
 
-直接実行する場合は、次のように `CXX_CHATWORK_PORT` を指定します。
+直接実行する場合は次のように指定します。
 
 ```sh
-CXX_CHATWORK_PORT=8080 ./build/cxx_chatwork
+CXX_CHATWORK_PORT=48080 ./build/cxx_chatwork
+CXX_CHATWORK_PORT=48080 CXX_CHATWORK_LISTEN=127.0.0.1 ./build/cxx_chatwork
 ```
 
-起動に成功すると、次のように待受ポートが表示されます。
-
-```text
-Listening on port 8080
-```
-
-`CXX_CHATWORK_PORT` が未指定、空文字、または `1` から `65535` の範囲外の場合はエラーで終了します。
+`CXX_CHATWORK_PORT` が未指定・空文字・範囲外、または `CXX_CHATWORK_LISTEN` に無効な IPv4 アドレスを指定した場合はエラーで終了します。
 
 ## Slack Webhook の受信内容
 
@@ -62,27 +67,7 @@ Listening on port 8080
 2. `message.text`
 3. トップレベルの `text`
 
-見つかったテキストから URL を抽出し、1行につき1件ずつ標準出力に表示します。
-
-たとえば次の payload を受け取ると:
-
-```json
-{
-  "event": {
-    "type": "message",
-    "text": "参考: https://example.com/docs と https://github.com/org/repo を見てください。"
-  }
-}
-```
-
-標準出力に次のように表示します。
-
-```text
-https://example.com/docs
-https://github.com/org/repo
-```
-
-レスポンスは通常 `200 OK` で、本文は `ok` です。
+見つかったテキストから URL を抽出し、登録済みの全クライアントの `process()` を呼び出します。
 
 ## Slack URL verification
 
@@ -101,35 +86,41 @@ HTTP レスポンス本文として `challenge-token` を返します。
 
 ## はてなブックマーク連携
 
-### HatenaClient の使い方
+### クラス構成
 
-`HatenaClient` のコンストラクタには consumer key と consumer secret を文字列で渡します。
-環境変数の読み取りは呼び出し側の責務です。
-
-```cpp
-const char* key    = std::getenv("HATENA_CONSUMER_KEY");
-const char* secret = std::getenv("HATENA_CONSUMER_SECRET");
-chatwork::HatenaClient client(key, secret);
 ```
+HatenaClient           (純粋仮想 process(uri) を持つベースクラス)
+  └─ HatenaBookmarkClient  (post_bookmark を実装)
+```
+
+`Server` は `HatenaClient` の配列を持ち、抽出した URI ごとに全クライアントの `process()` を呼び出します。
 
 ### OAuth 認証
 
-`oauth()` を呼ぶと、はてな OAuth のリクエストトークンを取得し、認可 URL を標準出力に表示します。
-表示された URL をブラウザで開いてアプリを認可してください。
+`OAuth` クラスが認証を担当します。`consumer_key` と `consumer_secret` はコンストラクタ引数で渡し、環境変数の読み取りは呼び出し側の責務です。
 
 ```cpp
-client.oauth();
+chatwork::OAuth oauth(consumer_key, consumer_secret);
+oauth.authorize();
 // => Authorize at: https://www.hatena.com/oauth/authorize?oauth_token=...
+// => Enter PIN:
 ```
 
-認可後、`request_token` と `request_token_secret` がインスタンスに格納されます。
+`authorize()` の処理順:
+1. はてな OAuth initiate エンドポイントへ POST → リクエストトークン取得
+2. 認可 URL を標準出力に表示
+3. 標準入力から PIN を受け取る
+4. アクセストークンに交換して内部に保持
 
 ### ブックマークの追加・更新
 
-`post_bookmark(url, comment, tags)` でブックマークを追加または更新します。
-`comment` と `tags` は省略できます。
+`HatenaBookmarkClient` の `post_bookmark(url, comment, tags)` でブックマークを追加または更新します。`comment` と `tags` は省略できます。
 
 ```cpp
+chatwork::OAuth oauth(consumer_key, consumer_secret);
+oauth.authorize();
+chatwork::HatenaBookmarkClient client(std::move(oauth));
+
 // URL のみ
 client.post_bookmark("https://example.com");
 
@@ -140,30 +131,31 @@ client.post_bookmark("https://example.com", "参考資料");
 client.post_bookmark("https://example.com", "参考資料", {"tech", "cpp"});
 ```
 
+Webhook 経由でブックマークが追加・更新されると、標準出力に次のように表示されます。
+
+```text
+[ADD] https://example.com/docs
+[UPDATE] https://github.com/takano32/brevaluck/pulls
+```
+
 ## 動作確認
 
 別のターミナルでサーバーを起動します。
 
 ```sh
-make run PORT=8080
+make run PORT=48080
 ```
 
 メッセージ受信を確認するには、次を実行します。
 
 ```sh
-make test-webhook PORT=8080
-```
-
-サーバー側の標準出力に次のように表示されます。
-
-```text
-https://github.com/org/repo/pull/1
+make test-webhook PORT=48080
 ```
 
 URL verification の応答を確認するには、次を実行します。
 
 ```sh
-make test-challenge PORT=8080
+make test-challenge PORT=48080
 ```
 
 レスポンス本文に `challenge-token` が返れば成功です。
@@ -175,18 +167,19 @@ make test-challenge PORT=8080
 | `make help` | 利用できるターゲットと変数を表示します。 |
 | `make configure` | CMake のビルドファイルを `build/` に生成します。 |
 | `make build` | `configure` を実行してから実行ファイルをビルドします。 |
-| `make run PORT=8080` | `CXX_CHATWORK_PORT=8080` を指定してサーバーを起動します。 |
+| `make run PORT=48080` | `CXX_CHATWORK_PORT=48080` を指定してサーバーを起動します。 |
 | `make clean` | `build/` を削除します。 |
 | `make rebuild` | `clean` の後に `build` を実行します。 |
-| `make test-webhook PORT=8080` | 起動中のサーバーへ URL を含む Slack メッセージ payload を POST します。 |
-| `make test-challenge PORT=8080` | 起動中のサーバーへ Slack URL verification payload を POST します。 |
-| `make test-uri PORT=8080` | 起動中のサーバーへ複数の URL を含む Slack メッセージ payload を POST します。 |
+| `make test-webhook PORT=48080` | 起動中のサーバーへ URL を含む Slack メッセージ payload を POST します。 |
+| `make test-challenge PORT=48080` | 起動中のサーバーへ Slack URL verification payload を POST します。 |
+| `make test-uri PORT=48080` | 起動中のサーバーへ複数の URL を含む Slack メッセージ payload を POST します。 |
 
 ## Makefile の変数
 
 | 変数 | 初期値 | 説明 |
 | --- | --- | --- |
-| `PORT` | `8080` | `make run` とテスト用ターゲットで使うポート番号です。 |
+| `PORT` | `48080` | `make run` とテスト用ターゲットで使うポート番号です。 |
+| `LISTEN` | (空、`0.0.0.0` 相当) | `make run` で使うリッスンアドレスです。 |
 | `BUILD_DIR` | `build` | CMake のビルドディレクトリです。 |
 
 ## 終了方法

@@ -1,30 +1,18 @@
 #pragma once
-#include <map>
+#include "oauth.hpp"
 #include <string>
-#include <string_view>
-#include <vector>
 
 namespace chatwork {
 
 class HatenaClient {
 public:
-    HatenaClient(const std::string& consumer_key, const std::string& consumer_secret);
-    void oauth();
-    void post_bookmark(const std::string& url,
-                       const std::string& comment = {},
-                       const std::vector<std::string>& tags = {});
+    explicit HatenaClient(OAuth oauth);
+    virtual ~HatenaClient() = default;
 
-private:
-    std::string consumer_key;
-    std::string consumer_secret;
-    std::string request_token;
-    std::string request_token_secret;
+    virtual void process(const std::string& uri) = 0;
 
-    std::string oauth_authorization_header(
-        std::string_view method,
-        std::string_view url,
-        const std::map<std::string, std::string>& body_params,
-        const std::map<std::string, std::string>& extra_oauth_params) const;
+protected:
+    OAuth _oauth;
 };
 
 } // namespace chatwork
