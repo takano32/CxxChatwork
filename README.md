@@ -3,11 +3,15 @@
 CxxChatwork は、C++23 で実装した小さな Slack Webhook 受信サーバーです。
 Slack から HTTP POST で送られてきた JSON payload を受け取り、メッセージ本文に含まれる URL を1行ずつ標準出力に表示します。
 
+また、はてなブックマーク REST API クライアントを内蔵しており、OAuth 1.0a 認証とブックマークの追加・更新を行えます。
+
 ## 必要なもの
 
 - C++23 に対応した C++ コンパイラ
 - CMake 3.20 以上
 - Make
+- OpenSSL (libcrypto) — はてな OAuth の HMAC-SHA1 署名に使用
+- libcurl — はてな API への HTTPS リクエストに使用
 - 動作確認用に `curl`
 
 ## ビルド方法
@@ -94,6 +98,47 @@ Slack Events API の URL verification payload に含まれる `challenge` に対
 ```
 
 HTTP レスポンス本文として `challenge-token` を返します。
+
+## はてなブックマーク連携
+
+### HatenaClient の使い方
+
+`HatenaClient` のコンストラクタには consumer key と consumer secret を文字列で渡します。
+環境変数の読み取りは呼び出し側の責務です。
+
+```cpp
+const char* key    = std::getenv("HATENA_CONSUMER_KEY");
+const char* secret = std::getenv("HATENA_CONSUMER_SECRET");
+chatwork::HatenaClient client(key, secret);
+```
+
+### OAuth 認証
+
+`oauth()` を呼ぶと、はてな OAuth のリクエストトークンを取得し、認可 URL を標準出力に表示します。
+表示された URL をブラウザで開いてアプリを認可してください。
+
+```cpp
+client.oauth();
+// => Authorize at: https://www.hatena.com/oauth/authorize?oauth_token=...
+```
+
+認可後、`request_token` と `request_token_secret` がインスタンスに格納されます。
+
+### ブックマークの追加・更新
+
+`post_bookmark(url, comment, tags)` でブックマークを追加または更新します。
+`comment` と `tags` は省略できます。
+
+```cpp
+// URL のみ
+client.post_bookmark("https://example.com");
+
+// コメント付き
+client.post_bookmark("https://example.com", "参考資料");
+
+// コメントとタグ付き
+client.post_bookmark("https://example.com", "参考資料", {"tech", "cpp"});
+```
 
 ## 動作確認
 

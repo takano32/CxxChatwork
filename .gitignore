@@ -1,3 +1,5 @@
 build/
 .git-store/
 .write-test
+.env
+.env.example
