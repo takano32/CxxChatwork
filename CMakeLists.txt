@@ -4,6 +4,10 @@ project(CxxChatwork LANGUAGES CXX)
 
 add_executable(cxx_chatwork
     src/main.cpp
+    src/http.cpp
+    src/json.cpp
+    src/server.cpp
+    src/uri.cpp
 )
 
 target_compile_features(cxx_chatwork PRIVATE cxx_std_23)

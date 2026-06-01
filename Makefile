@@ -1,4 +1,4 @@
-.PHONY: help configure build run rebuild clean test-webhook test-challenge
+.PHONY: help configure build run rebuild clean test-webhook test-challenge test-uri
 
 BUILD_DIR ?= build
 PORT ?= 8080
@@ -13,8 +13,9 @@ help:
 		'  make clean           Remove build artifacts' \
 		'  make rebuild         Clean, configure, and build' \
 		'  make configure       Generate CMake build files' \
-		'  make test-webhook    POST a sample Slack message to the running server' \
+		'  make test-webhook    POST a Slack message containing URLs to the running server' \
 		'  make test-challenge  POST a Slack URL verification payload' \
+		'  make test-uri        POST a Slack message with multiple URLs to the running server' \
 		'' \
 		'Variables:' \
 		'  PORT=18080           Port used by run and test targets' \
@@ -37,9 +38,14 @@ clean:
 test-webhook:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","text":"hello from slack"}}'
+		--data '{"event":{"type":"message","text":"PR を確認してください https://github.com/org/repo/pull/1"}}'
 
 test-challenge:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
 		--data '{"type":"url_verification","challenge":"challenge-token"}'
+
+test-uri:
+	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
+		-H 'Content-Type: application/json' \
+		--data '{"event":{"type":"message","text":"参考: https://example.com/docs と https://github.com/org/repo を見てください。"}}'
