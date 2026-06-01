@@ -1,7 +1,7 @@
 # CxxChatwork
 
 CxxChatwork は、C++23 で実装した小さな Slack Webhook 受信サーバーです。
-Slack から HTTP POST で送られてきた JSON payload を受け取り、メッセージ本文を標準出力に表示します。
+Slack から HTTP POST で送られてきた JSON payload を受け取り、メッセージ本文に含まれる URL を1行ずつ標準出力に表示します。
 
 ## 必要なもの
 
@@ -52,21 +52,30 @@ Listening on port 8080
 ## Slack Webhook の受信内容
 
 サーバーは HTTP POST の本文を Slack の JSON payload として扱います。
-次の順番でメッセージ本文を探し、見つかった文字列を標準出力に表示します。
+次の順番でメッセージ本文を探します。
 
 1. `event.text`
 2. `message.text`
 3. トップレベルの `text`
 
-たとえば次の payload を受け取ると、標準出力に `hello from slack` と表示します。
+見つかったテキストから URL を抽出し、1行につき1件ずつ標準出力に表示します。
+
+たとえば次の payload を受け取ると:
 
 ```json
 {
   "event": {
     "type": "message",
-    "text": "hello from slack"
+    "text": "参考: https://example.com/docs と https://github.com/org/repo を見てください。"
   }
 }
+```
+
+標準出力に次のように表示します。
+
+```text
+https://example.com/docs
+https://github.com/org/repo
 ```
 
 レスポンスは通常 `200 OK` で、本文は `ok` です。
@@ -103,7 +112,7 @@ make test-webhook PORT=8080
 サーバー側の標準出力に次のように表示されます。
 
 ```text
-hello from slack
+https://github.com/org/repo/pull/1
 ```
 
 URL verification の応答を確認するには、次を実行します。
@@ -124,8 +133,9 @@ make test-challenge PORT=8080
 | `make run PORT=8080` | `CXX_CHATWORK_PORT=8080` を指定してサーバーを起動します。 |
 | `make clean` | `build/` を削除します。 |
 | `make rebuild` | `clean` の後に `build` を実行します。 |
-| `make test-webhook PORT=8080` | 起動中のサーバーへサンプルの Slack メッセージ payload を POST します。 |
+| `make test-webhook PORT=8080` | 起動中のサーバーへ URL を含む Slack メッセージ payload を POST します。 |
 | `make test-challenge PORT=8080` | 起動中のサーバーへ Slack URL verification payload を POST します。 |
+| `make test-uri PORT=8080` | 起動中のサーバーへ複数の URL を含む Slack メッセージ payload を POST します。 |
 
 ## Makefile の変数
 
