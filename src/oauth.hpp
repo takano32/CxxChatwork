@@ -9,6 +9,9 @@ class OAuth {
 public:
     OAuth(const std::string& consumer_key, const std::string& consumer_secret);
     void authorize();
+    void set_tokens(const std::string& token, const std::string& token_secret);
+    const std::string& token() const;
+    const std::string& token_secret() const;
     std::string authorization_header(
         std::string_view method,
         std::string_view url,

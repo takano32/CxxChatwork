@@ -11,12 +11,16 @@ public:
     const std::string& listen_address() const;
     const std::string& hatena_consumer_key() const;
     const std::string& hatena_consumer_secret() const;
+    const std::string& hatena_access_token() const;
+    const std::string& hatena_access_token_secret() const;
 
 private:
     std::uint16_t _listen_port;
     std::string _listen_address;
     std::string _hatena_consumer_key;
     std::string _hatena_consumer_secret;
+    std::string _hatena_access_token;
+    std::string _hatena_access_token_secret;
 };
 
 } // namespace chatwork

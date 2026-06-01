@@ -36,11 +36,23 @@ Config::Config() {
         throw std::runtime_error("HATENA_CONSUMER_SECRET is required");
     }
     _hatena_consumer_secret = secret_env;
+
+    const char* token_env = std::getenv("HATENA_ACCESS_TOKEN");
+    if (token_env != nullptr && *token_env != '\0') {
+        _hatena_access_token = token_env;
+    }
+
+    const char* token_secret_env = std::getenv("HATENA_ACCESS_TOKEN_SECRET");
+    if (token_secret_env != nullptr && *token_secret_env != '\0') {
+        _hatena_access_token_secret = token_secret_env;
+    }
 }
 
 std::uint16_t Config::listen_port() const { return _listen_port; }
 const std::string& Config::listen_address() const { return _listen_address; }
 const std::string& Config::hatena_consumer_key() const { return _hatena_consumer_key; }
 const std::string& Config::hatena_consumer_secret() const { return _hatena_consumer_secret; }
+const std::string& Config::hatena_access_token() const { return _hatena_access_token; }
+const std::string& Config::hatena_access_token_secret() const { return _hatena_access_token_secret; }
 
 } // namespace chatwork

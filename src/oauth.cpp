@@ -148,6 +148,14 @@ std::string post_request(const std::string& url,
 OAuth::OAuth(const std::string& consumer_key, const std::string& consumer_secret)
     : _consumer_key(consumer_key), _consumer_secret(consumer_secret) {}
 
+void OAuth::set_tokens(const std::string& token, const std::string& token_secret) {
+    _token        = token;
+    _token_secret = token_secret;
+}
+
+const std::string& OAuth::token() const { return _token; }
+const std::string& OAuth::token_secret() const { return _token_secret; }
+
 std::string OAuth::authorization_header(
     std::string_view method,
     std::string_view url,

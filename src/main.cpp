@@ -15,7 +15,14 @@ int main() {
         const chatwork::Config config;
 
         chatwork::OAuth oauth(config.hatena_consumer_key(), config.hatena_consumer_secret());
-        oauth.authorize();
+
+        if (!config.hatena_access_token().empty()) {
+            oauth.set_tokens(config.hatena_access_token(), config.hatena_access_token_secret());
+        } else {
+            oauth.authorize();
+            std::cout << "HATENA_ACCESS_TOKEN=" << oauth.token() << std::endl;
+            std::cout << "HATENA_ACCESS_TOKEN_SECRET=" << oauth.token_secret() << std::endl;
+        }
 
         std::vector<std::unique_ptr<chatwork::HatenaClient>> clients;
         clients.push_back(std::make_unique<chatwork::HatenaBookmarkClient>(std::move(oauth)));
