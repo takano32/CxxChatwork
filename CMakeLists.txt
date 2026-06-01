@@ -7,13 +7,15 @@ find_package(CURL REQUIRED)
 
 add_executable(cxx_chatwork
     src/main.cpp
-    src/http.cpp
-    src/json.cpp
-    src/server.cpp
+    src/config.cpp
+    src/http_request.cpp
+    src/http_response.cpp
+    src/slack_payload.cpp
     src/uri.cpp
+    src/oauth.cpp
     src/hatena_client.cpp
     src/hatena_bookmark_client.cpp
-    src/oauth.cpp
+    src/server.cpp
 )
 
 target_link_libraries(cxx_chatwork PRIVATE OpenSSL::Crypto CURL::libcurl)

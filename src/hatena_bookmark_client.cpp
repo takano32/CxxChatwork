@@ -44,7 +44,7 @@ std::size_t write_callback(char* ptr, std::size_t size, std::size_t nmemb, void*
 void HatenaBookmarkClient::process(const std::string& uri) {
     const auto result = post_bookmark(uri);
     const auto label = (result == BookmarkResult::Added) ? "[ADD]" : "[UPDATE]";
-    std::cout << label << " " << uri << "\n";
+    std::cout << label << " " << uri << std::endl;
 }
 
 BookmarkResult HatenaBookmarkClient::post_bookmark(const std::string& url,

@@ -1,6 +1,7 @@
 #include "server.hpp"
-#include "http.hpp"
-#include "json.hpp"
+#include "http_request.hpp"
+#include "http_response.hpp"
+#include "slack_payload.hpp"
 #include "uri.hpp"
 
 #include <arpa/inet.h>
@@ -66,22 +67,22 @@ Server::Server(std::vector<std::unique_ptr<HatenaClient>> clients,
 }
 
 void Server::handle_client(int client_fd) {
-    const std::string request = read_http_request(client_fd);
-    const std::string_view body = http_body(request);
+    const HttpRequest request(client_fd);
+    const SlackPayload payload(request.body());
 
-    if (const auto challenge = find_json_string_value(body, "challenge")) {
-        respond_ok(client_fd, *challenge);
+    if (const auto challenge = payload.challenge()) {
+        HttpResponse::ok(client_fd, *challenge);
         return;
     }
 
-    const auto source = slack_message_text(body).value_or(std::string(body));
-    for (const auto& uri : URI::extract(source)) {
+    const auto text = payload.text().value_or(std::string(request.body()));
+    for (const auto& uri : URI::extract(text)) {
         for (const auto& client : _clients) {
             client->process(uri);
         }
     }
 
-    respond_ok(client_fd);
+    HttpResponse::ok(client_fd);
 }
 
 void Server::run() {
@@ -90,9 +91,7 @@ void Server::run() {
         socklen_t client_size = sizeof(client_address);
         Socket client(::accept(_socket.get(), reinterpret_cast<sockaddr*>(&client_address), &client_size));
         if (client.get() < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
+            if (errno == EINTR) continue;
             throw std::runtime_error(std::string("accept failed: ") + std::strerror(errno));
         }
 

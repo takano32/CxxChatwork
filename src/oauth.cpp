@@ -214,7 +214,7 @@ void OAuth::authorize() {
     }
 
     std::cout << "Authorize at: https://www.hatena.com/oauth/authorize?oauth_token="
-              << _token << "\n";
+              << _token << std::endl;
     std::cout << "Enter PIN: " << std::flush;
     std::string verifier;
     std::getline(std::cin, verifier);
