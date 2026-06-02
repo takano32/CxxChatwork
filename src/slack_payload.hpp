@@ -1,4 +1,6 @@
 #pragma once
+#include "json.hpp"
+
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,7 +14,7 @@ public:
     std::optional<std::string> text() const;
 
 private:
-    std::string _body;
+    JSON _json;
 };
 
 } // namespace chatwork

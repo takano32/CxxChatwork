@@ -10,6 +10,7 @@ add_executable(cxx_chatwork
     src/config.cpp
     src/http_request.cpp
     src/http_response.cpp
+    src/json.cpp
     src/slack_payload.cpp
     src/uri.cpp
     src/oauth.cpp
