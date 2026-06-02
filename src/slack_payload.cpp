@@ -15,9 +15,10 @@ std::optional<std::string> string_at(const JSON& node, std::string_view key) {
     return std::nullopt;
 }
 
-std::optional<std::string> text_under(const JSON& root, std::string_view container) {
+std::optional<std::string> value_under(const JSON& root, std::string_view container,
+                                       std::string_view key) {
     if (root.is_object() && root.contains(container)) {
-        return string_at(root.at(container), "text");
+        return string_at(root.at(container), key);
     }
     return std::nullopt;
 }
@@ -32,16 +33,27 @@ JSON parse_body(std::string_view body) {
 
 } // namespace
 
-SlackPayload::SlackPayload(std::string_view body) : _json(parse_body(body)) {}
+SlackPayload::SlackPayload(std::string_view body) : _body(body) {
+    const JSON json = parse_body(body);
 
-std::optional<std::string> SlackPayload::challenge() const {
-    return string_at(_json, "challenge");
+    _challenge = string_at(json, "challenge");
+
+    // text フィールドが無ければ body 全体を対象とする
+    _text = value_under(json, "event", "text")
+                .or_else([&] { return value_under(json, "message", "text"); })
+                .or_else([&] { return string_at(json, "text"); })
+                .value_or(_body);
+
+    // 送信者が無ければ空文字列
+    _user_id = value_under(json, "event", "user")
+                   .or_else([&] { return value_under(json, "message", "user"); })
+                   .or_else([&] { return string_at(json, "user"); })
+                   .value_or(std::string{});
 }
 
-std::optional<std::string> SlackPayload::text() const {
-    return text_under(_json, "event")
-        .or_else([this] { return text_under(_json, "message"); })
-        .or_else([this] { return string_at(_json, "text"); });
-}
+const std::string& SlackPayload::body() const { return _body; }
+const std::optional<std::string>& SlackPayload::challenge() const { return _challenge; }
+const std::string& SlackPayload::text() const { return _text; }
+const std::string& SlackPayload::user_id() const { return _user_id; }
 
 } // namespace chatwork

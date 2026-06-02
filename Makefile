@@ -41,7 +41,7 @@ clean:
 test-webhook:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","text":"PR を確認してください https://github.com/takano32/brevaluck/pulls"}}'
+		--data '{"event":{"type":"message","user":"U07TAKANO32","text":"PR を確認してください https://github.com/takano32/brevaluck/pulls"}}'
 
 test-challenge:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
@@ -51,7 +51,7 @@ test-challenge:
 test-uri:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","text":"参考: https://github.com/takano32/brevaluck/ と https://developer.hatena.ne.jp/ を見てください。"}}'
+		--data '{"event":{"type":"message","user":"U07TAKANO32","text":"参考: https://github.com/takano32/brevaluck/ と https://developer.hatena.ne.jp/ を見てください。"}}'
 
 test-get:
 	curl -sS -i -G http://127.0.0.1:$(PORT)/bookmark \

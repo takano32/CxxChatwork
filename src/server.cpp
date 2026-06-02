@@ -5,6 +5,7 @@
 #include "slack_payload.hpp"
 #include "uri.hpp"
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>
@@ -111,12 +112,13 @@ void Server::handle_client(int client_fd) {
 
     const SlackPayload payload(request.body());
 
-    if (const auto challenge = payload.challenge()) {
+    if (const auto& challenge = payload.challenge()) {
         HttpResponse::ok(client_fd, *challenge);
         return;
     }
 
-    const auto text = payload.text().value_or(std::string(request.body()));
+    const auto& text = payload.text();
+    const auto& user_id = payload.user_id();
     for (const auto& url : URI::extract_url(text)) {
         // 既存のブックマークがあれば comment/tags を引き継いで上書き消失を防ぐ
         std::string comment;
@@ -127,6 +129,10 @@ void Server::handle_client(int client_fd) {
             tags = existing.tags();
         } catch (const std::exception&) {
             // 未ブックマークなどで取得できない場合は新規として登録する
+        }
+        // 送信者を tags に追加する（空でなく、まだ含まれていない場合のみ）
+        if (!user_id.empty() && std::find(tags.begin(), tags.end(), user_id) == tags.end()) {
+            tags.push_back(user_id);
         }
         _client.post_bookmark(url, comment, tags);
     }
