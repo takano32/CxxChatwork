@@ -128,21 +128,26 @@ void Server::handle_client(int client_fd) {
 
     const auto& user_id = payload.user_id();
     for (const auto& url : URI::extract_url(payload.text())) {
-        // 既存のブックマークがあれば comment/tags を引き継いで上書き消失を防ぐ
-        std::string comment;
-        std::vector<std::string> tags;
+        // URL ごとに失敗を握り、1件の失敗で webhook 全体を落とさない
         try {
-            const auto existing = std::get<0>(_client.get_bookmark(url));
-            comment = existing.comment();
-            tags = existing.tags();
-        } catch (const std::exception&) {
-            // 未ブックマークなどで取得できない場合は新規として登録する
+            // 既存のブックマークがあれば comment/tags を引き継いで上書き消失を防ぐ
+            std::string comment;
+            std::vector<std::string> tags;
+            try {
+                const auto existing = std::get<0>(_client.get_bookmark(url));
+                comment = existing.comment();
+                tags = existing.tags();
+            } catch (const std::exception&) {
+                // 未ブックマークなどで取得できない場合は新規として登録する
+            }
+            // 送信者を tags に追加する（空でなく、まだ含まれていない場合のみ）
+            if (!user_id.empty() && std::find(tags.begin(), tags.end(), user_id) == tags.end()) {
+                tags.push_back(user_id);
+            }
+            _client.post_bookmark(url, comment, tags);
+        } catch (const std::exception& error) {
+            std::cerr << "bookmark failed for " << url << ": " << error.what() << std::endl;
         }
-        // 送信者を tags に追加する（空でなく、まだ含まれていない場合のみ）
-        if (!user_id.empty() && std::find(tags.begin(), tags.end(), user_id) == tags.end()) {
-            tags.push_back(user_id);
-        }
-        _client.post_bookmark(url, comment, tags);
     }
 
     HttpResponse::ok(client_fd);
