@@ -1,6 +1,7 @@
 #include "oauth.hpp"
 
 #include <chrono>
+#include <format>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -137,7 +138,7 @@ std::string post_request(const std::string& url,
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-        throw std::runtime_error(std::string("curl error: ") + curl_easy_strerror(res));
+        throw std::runtime_error(std::format("curl error: {}", curl_easy_strerror(res)));
     }
 
     return response_body;
@@ -218,7 +219,7 @@ void OAuth::authorize() {
     _token_secret = url_decode(parse_oauth_param(initiate_response, "oauth_token_secret"));
 
     if (_token.empty()) {
-        throw std::runtime_error("failed to get request token: " + initiate_response);
+        throw std::runtime_error(std::format("failed to get request token: {}", initiate_response));
     }
 
     std::cout << "Authorize at: https://www.hatena.com/oauth/authorize?oauth_token="
@@ -240,7 +241,7 @@ void OAuth::authorize() {
     const std::string access_token_secret = url_decode(parse_oauth_param(token_response, "oauth_token_secret"));
 
     if (access_token.empty()) {
-        throw std::runtime_error("failed to get access token: " + token_response);
+        throw std::runtime_error(std::format("failed to get access token: {}", token_response));
     }
 
     _token        = access_token;

@@ -3,6 +3,7 @@
 #include "json.hpp"
 
 #include <algorithm>
+#include <format>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -51,7 +52,7 @@ std::string format_bookmark_line(std::string_view label,
         if (i > 0) joined_tags += "][";
         joined_tags += tags[i];
     }
-    return std::string(label) + " [" + joined_tags + "], " + url + ", " + comment;
+    return std::format("{} [{}], {}, {}", label, joined_tags, url, comment);
 }
 
 } // namespace
@@ -110,11 +111,11 @@ BookmarkResult HatenaBookmarkClient::post_bookmark(const std::string& url,
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-        throw std::runtime_error(std::string("curl error: ") + curl_easy_strerror(res));
+        throw std::runtime_error(std::format("curl error: {}", curl_easy_strerror(res)));
     }
     if (http_code != 200 && http_code != 201) {
-        throw std::runtime_error("bookmark API error: HTTP " + std::to_string(http_code)
-                                 + " " + response_body);
+        throw std::runtime_error(
+            std::format("bookmark API error: HTTP {} {}", http_code, response_body));
     }
 
     return http_code == 201 ? BookmarkResult::Added : BookmarkResult::Updated;
@@ -152,11 +153,11 @@ HatenaBookmark HatenaBookmarkClient::get_bookmark(const std::string& url) {
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-        throw std::runtime_error(std::string("curl error: ") + curl_easy_strerror(res));
+        throw std::runtime_error(std::format("curl error: {}", curl_easy_strerror(res)));
     }
     if (http_code != 200) {
-        throw std::runtime_error("bookmark API error: HTTP " + std::to_string(http_code)
-                                 + " " + response_body);
+        throw std::runtime_error(
+            std::format("bookmark API error: HTTP {} {}", http_code, response_body));
     }
 
     const JSON json = JSON::parse(response_body);

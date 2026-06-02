@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <csignal>
 #include <cstring>
+#include <format>
 #include <iostream>
 #include <stdexcept>
 #include <sys/socket.h>
@@ -30,7 +31,7 @@ void install_signal_handlers() {
     action.sa_flags = 0;
 
     if (::sigaction(SIGINT, &action, nullptr) < 0 || ::sigaction(SIGTERM, &action, nullptr) < 0) {
-        throw std::runtime_error(std::string("sigaction failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::format("sigaction failed: {}", std::strerror(errno)));
     }
 }
 
@@ -40,27 +41,27 @@ Server::Server(std::vector<std::unique_ptr<HatenaClient>> clients,
     : _clients(std::move(clients)) {
     Socket s(::socket(AF_INET, SOCK_STREAM, 0));
     if (s.get() < 0) {
-        throw std::runtime_error(std::string("socket failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::format("socket failed: {}", std::strerror(errno)));
     }
 
     int yes = 1;
     if (::setsockopt(s.get(), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
-        throw std::runtime_error(std::string("setsockopt failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::format("setsockopt failed: {}", std::strerror(errno)));
     }
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
     if (::inet_pton(AF_INET, listen_address.c_str(), &address.sin_addr) != 1) {
-        throw std::runtime_error("invalid listen address: " + listen_address);
+        throw std::runtime_error(std::format("invalid listen address: {}", listen_address));
     }
     address.sin_port = htons(listen_port);
 
     if (::bind(s.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
-        throw std::runtime_error(std::string("bind failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::format("bind failed: {}", std::strerror(errno)));
     }
 
     if (::listen(s.get(), SOMAXCONN) < 0) {
-        throw std::runtime_error(std::string("listen failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::format("listen failed: {}", std::strerror(errno)));
     }
 
     _socket = std::move(s);
@@ -92,7 +93,7 @@ void Server::run() {
         Socket client(::accept(_socket.get(), reinterpret_cast<sockaddr*>(&client_address), &client_size));
         if (client.get() < 0) {
             if (errno == EINTR) continue;
-            throw std::runtime_error(std::string("accept failed: ") + std::strerror(errno));
+            throw std::runtime_error(std::format("accept failed: {}", std::strerror(errno)));
         }
 
         try {

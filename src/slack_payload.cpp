@@ -15,6 +15,13 @@ std::optional<std::string> string_at(const JSON& node, std::string_view key) {
     return std::nullopt;
 }
 
+std::optional<std::string> text_under(const JSON& root, std::string_view container) {
+    if (root.is_object() && root.contains(container)) {
+        return string_at(root.at(container), "text");
+    }
+    return std::nullopt;
+}
+
 JSON parse_body(std::string_view body) {
     try {
         return JSON::parse(body);
@@ -32,15 +39,9 @@ std::optional<std::string> SlackPayload::challenge() const {
 }
 
 std::optional<std::string> SlackPayload::text() const {
-    if (_json.is_object()) {
-        if (_json.contains("event")) {
-            if (auto t = string_at(_json.at("event"), "text")) return t;
-        }
-        if (_json.contains("message")) {
-            if (auto t = string_at(_json.at("message"), "text")) return t;
-        }
-    }
-    return string_at(_json, "text");
+    return text_under(_json, "event")
+        .or_else([this] { return text_under(_json, "message"); })
+        .or_else([this] { return string_at(_json, "text"); });
 }
 
 } // namespace chatwork
