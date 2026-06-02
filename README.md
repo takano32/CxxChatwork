@@ -66,16 +66,21 @@ CXX_CHATWORK_PORT=48080 CXX_CHATWORK_LISTEN=127.0.0.1 ./build/cxx_chatwork
 
 ## Slack Webhook の受信内容
 
-サーバーは HTTP POST の本文を Slack の JSON payload として扱います。
-次の順番でメッセージ本文を探します。
+サーバーは HTTP POST の本文を Slack の JSON payload として扱います。JSON のパースは自前の `JSON` クラス（`JSON::parse`）で行い、`SlackPayload` がコンストラクタでメッセージ本文と送信者を解決して保持します。
+
+メッセージ本文（`text`）は次の順番で探します。
 
 1. `event.text`
 2. `message.text`
 3. トップレベルの `text`
 
-見つかったテキストから `URI::extract_url()` で URL を抽出します。抽出対象は `http` / `https` スキームの URL のみです。JSON のパースは自前の `JSON` クラス（`JSON::parse`）で行います。
+いずれも見つからない場合は、本文（body）全体をメッセージ本文として扱います。
 
-抽出した各 URL について、まず `get_bookmark()` で既存のブックマークを取得し、その `comment` と `tags` を引き継いだうえで `post_bookmark()` を呼び出します。これにより、既存のコメント・タグが上書きで消えるのを防ぎます。まだブックマークされていない URL は取得に失敗するため、新規として登録します。
+送信者（`user_id`）も同様に `event.user` → `message.user` → トップレベル `user` の順で探します。
+
+見つかったテキストから `URI::extract_url()` で URL を抽出します。抽出対象は `http` / `https` スキームの URL のみです。
+
+抽出した各 URL について、まず `get_bookmark()` で既存のブックマークを取得し、その `comment` と `tags` を引き継ぎます（既存のコメント・タグが上書きで消えるのを防ぎます。まだブックマークされていない URL は取得に失敗するため新規登録になります）。次に、送信者の `user_id` を `tags` に追加してから `post_bookmark()` を呼び出します。`user_id` が空の場合や、すでに同じタグが含まれている場合は追加しません。
 
 ## Slack URL verification
 
