@@ -45,11 +45,27 @@ std::string field_or_empty(const std::unordered_map<std::string, std::string>& f
     return it != fields.end() ? it->second : std::string{};
 }
 
+// Slack はテキスト中の & < > を &amp; &lt; &gt; にエスケープして送るため戻す。
+// & を最後に戻すことで &amp;lt; のような二重エスケープも正しく復元する。
+std::string unescape_html(std::string s) {
+    const auto replace_all = [&s](std::string_view from, char to) {
+        std::size_t pos = 0;
+        while ((pos = s.find(from, pos)) != std::string::npos) {
+            s.replace(pos, from.size(), 1, to);
+            pos += 1;
+        }
+    };
+    replace_all("&lt;", '<');
+    replace_all("&gt;", '>');
+    replace_all("&amp;", '&');
+    return s;
+}
+
 } // namespace
 
 SlackPayload::SlackPayload(std::string_view body) {
     const auto fields = parse_form(body);
-    _text = field_or_empty(fields, "text");
+    _text = unescape_html(field_or_empty(fields, "text"));
     _user_id = field_or_empty(fields, "user_id");
     _token = field_or_empty(fields, "token");
 }
