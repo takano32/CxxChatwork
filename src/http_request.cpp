@@ -75,7 +75,24 @@ HttpRequest::HttpRequest(int fd) {
             break;
         }
     }
+
+    const std::size_t line_end = _raw.find("\r\n");
+    const std::string_view request_line(
+        _raw.data(), line_end == std::string::npos ? _raw.size() : line_end);
+    const std::size_t method_end = request_line.find(' ');
+    if (method_end != std::string_view::npos) {
+        _method = request_line.substr(0, method_end);
+        const std::size_t target_start = method_end + 1;
+        const std::size_t target_end = request_line.find(' ', target_start);
+        _target = request_line.substr(
+            target_start,
+            target_end == std::string_view::npos ? std::string_view::npos
+                                                 : target_end - target_start);
+    }
 }
+
+std::string_view HttpRequest::method() const { return _method; }
+std::string_view HttpRequest::target() const { return _target; }
 
 std::string_view HttpRequest::body() const {
     if (_body_offset == std::string::npos || _body_offset > _raw.size()) return {};

@@ -1,4 +1,4 @@
-.PHONY: help configure build run rebuild clean test-webhook test-challenge test-uri
+.PHONY: help configure build run rebuild clean test-webhook test-challenge test-uri test-get
 
 LISTEN ?=
 
@@ -18,6 +18,7 @@ help:
 		'  make test-webhook    POST a Slack message containing URLs to the running server' \
 		'  make test-challenge  POST a Slack URL verification payload' \
 		'  make test-uri        POST a Slack message with multiple URLs to the running server' \
+		'  make test-get        GET a bookmark for a URL from the running server' \
 		'' \
 		'Variables:' \
 		'  PORT=48080           Port used by run and test targets' \
@@ -51,3 +52,7 @@ test-uri:
 	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
 		-H 'Content-Type: application/json' \
 		--data '{"event":{"type":"message","text":"参考: https://github.com/takano32/brevaluck/ と https://developer.hatena.ne.jp/ を見てください。"}}'
+
+test-get:
+	curl -sS -i -G http://127.0.0.1:$(PORT)/bookmark \
+		--data-urlencode 'url=https://github.com/takano32/brevaluck/'

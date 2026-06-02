@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "hatena_bookmark_client.hpp"
 #include "http_request.hpp"
 #include "http_response.hpp"
 #include "slack_payload.hpp"
@@ -7,6 +8,7 @@
 #include <arpa/inet.h>
 #include <cerrno>
 #include <csignal>
+#include <cstdlib>
 #include <cstring>
 #include <format>
 #include <iostream>
@@ -20,6 +22,38 @@ volatile std::sig_atomic_t keep_running = 1;
 
 void handle_signal(int) {
     keep_running = 0;
+}
+
+std::string url_decode(std::string_view s) {
+    std::string result;
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '%' && i + 2 < s.size()) {
+            const char hex[3] = {s[i + 1], s[i + 2], '\0'};
+            result += static_cast<char>(std::strtol(hex, nullptr, 16));
+            i += 2;
+        } else if (s[i] == '+') {
+            result += ' ';
+        } else {
+            result += s[i];
+        }
+    }
+    return result;
+}
+
+std::string query_param(std::string_view query, std::string_view key) {
+    std::size_t pos = 0;
+    while (pos < query.size()) {
+        const std::size_t amp = query.find('&', pos);
+        const std::string_view pair =
+            query.substr(pos, amp == std::string_view::npos ? std::string_view::npos : amp - pos);
+        const std::size_t eq = pair.find('=');
+        if (eq != std::string_view::npos && pair.substr(0, eq) == key) {
+            return url_decode(pair.substr(eq + 1));
+        }
+        if (amp == std::string_view::npos) break;
+        pos = amp + 1;
+    }
+    return {};
 }
 
 } // namespace
@@ -69,6 +103,12 @@ Server::Server(std::vector<std::unique_ptr<HatenaClient>> clients,
 
 void Server::handle_client(int client_fd) {
     const HttpRequest request(client_fd);
+
+    if (request.method() == "GET") {
+        handle_get(client_fd, request.target());
+        return;
+    }
+
     const SlackPayload payload(request.body());
 
     if (const auto challenge = payload.challenge()) {
@@ -80,6 +120,35 @@ void Server::handle_client(int client_fd) {
     for (const auto& url : URI::extract_url(text)) {
         for (const auto& client : _clients) {
             client->process(url);
+        }
+    }
+
+    HttpResponse::ok(client_fd);
+}
+
+void Server::handle_get(int client_fd, std::string_view target) {
+    const std::size_t query_start = target.find('?');
+    const std::string_view path = target.substr(0, query_start);
+    const std::string url = (query_start == std::string_view::npos)
+                                ? std::string{}
+                                : query_param(target.substr(query_start + 1), "url");
+
+    if (path != "/bookmark" || url.empty()) {
+        HttpResponse::ok(client_fd);
+        return;
+    }
+
+    for (const auto& client : _clients) {
+        if (auto* bookmark_client = dynamic_cast<HatenaBookmarkClient*>(client.get())) {
+            const auto [bookmark, result] = bookmark_client->get_bookmark(url);
+            std::string joined_tags;
+            for (const auto& tag : bookmark.tags()) {
+                joined_tags += '[' + tag + ']';
+            }
+            HttpResponse::ok(client_fd,
+                             std::format("{}, {}, {}\n", joined_tags, bookmark.url(),
+                                         bookmark.comment()));
+            return;
         }
     }
 
