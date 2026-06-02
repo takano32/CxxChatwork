@@ -7,7 +7,7 @@ namespace chatwork {
 
 class URI {
 public:
-    static std::vector<std::string> extract(std::string_view text);
+    static std::vector<std::string> extract_url(std::string_view text);
 };
 
 } // namespace chatwork

@@ -76,9 +76,9 @@ void Server::handle_client(int client_fd) {
     }
 
     const auto text = payload.text().value_or(std::string(request.body()));
-    for (const auto& uri : URI::extract(text)) {
+    for (const auto& url : URI::extract_url(text)) {
         for (const auto& client : _clients) {
-            client->process(uri);
+            client->process(url);
         }
     }
 

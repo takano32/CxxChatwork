@@ -15,6 +15,7 @@ add_executable(cxx_chatwork
     src/uri.cpp
     src/oauth.cpp
     src/hatena_client.cpp
+    src/hatena_bookmark.cpp
     src/hatena_bookmark_client.cpp
     src/server.cpp
 )

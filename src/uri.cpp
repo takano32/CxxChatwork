@@ -3,23 +3,23 @@
 
 namespace chatwork {
 
-std::vector<std::string> URI::extract(std::string_view text) {
+std::vector<std::string> URI::extract_url(std::string_view text) {
     static const std::regex pattern(
-        R"([a-zA-Z][a-zA-Z0-9+\-.]*://[^\s"'<>]+)");
+        R"(https?://[^\s"'<>]+)");
 
     std::vector<std::string> result;
     auto it = std::cregex_iterator(text.data(), text.data() + text.size(), pattern);
     const auto end = std::cregex_iterator{};
 
     for (; it != end; ++it) {
-        std::string uri = it->str();
-        // trailing punctuation that belongs to surrounding sentence, not the URI
-        while (!uri.empty() && (uri.back() == '.' || uri.back() == ',' ||
-                                uri.back() == ')' || uri.back() == ']')) {
-            uri.pop_back();
+        std::string url = it->str();
+        // trailing punctuation that belongs to surrounding sentence, not the URL
+        while (!url.empty() && (url.back() == '.' || url.back() == ',' ||
+                                url.back() == ')' || url.back() == ']')) {
+            url.pop_back();
         }
-        if (!uri.empty()) {
-            result.push_back(std::move(uri));
+        if (!url.empty()) {
+            result.push_back(std::move(url));
         }
     }
 
