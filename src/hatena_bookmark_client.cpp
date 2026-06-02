@@ -43,7 +43,7 @@ std::size_t write_callback(char* ptr, std::size_t size, std::size_t nmemb, void*
     return size * nmemb;
 }
 
-std::string format_bookmark_line(std::string_view label,
+std::string format_bookmark_line(std::string_view method,
                                  const std::string& url,
                                  const std::string& comment,
                                  const std::vector<std::string>& tags) {
@@ -52,21 +52,22 @@ std::string format_bookmark_line(std::string_view label,
         if (i > 0) joined_tags += "][";
         joined_tags += tags[i];
     }
-    return std::format("{} [{}], {}, {}", label, joined_tags, url, comment);
+    return std::format("[{}]: [{}] {} # {}", method, joined_tags, url, comment);
 }
 
 std::string_view result_label(HatenaBookmarkResult result) {
     switch (result) {
-    case HatenaBookmarkResult::Added:   return "[ADD]";
-    case HatenaBookmarkResult::Updated: return "[UPDATE]";
-    case HatenaBookmarkResult::Got:     return "[GET]";
+    case HatenaBookmarkResult::Added:   return "ADD";
+    case HatenaBookmarkResult::Updated: return "UPDATE";
+    case HatenaBookmarkResult::Got:     return "GET";
     }
-    return "[?]";
+    return "?";
 }
 
 HatenaBookmark parse_bookmark(const std::string& url, const std::string& response_body) {
     const JSON json = JSON::parse(response_body);
 
+    // comment はタグ記法 [tag] を取り除いた整形済みコメント
     std::string comment;
     if (json.contains("comment") && json.at("comment").is_string()) {
         comment = json.at("comment").string();
@@ -79,7 +80,12 @@ HatenaBookmark parse_bookmark(const std::string& url, const std::string& respons
                                               [](const JSON& tag) { return tag.is_string(); });
         if (all_strings) {
             for (const auto& tag : array) {
-                tags.push_back(tag.string());
+                // はてなのタグは [tag] 単位。1要素に空白が含まれる場合は個別タグに分割する
+                std::istringstream stream(tag.string());
+                std::string token;
+                while (stream >> token) {
+                    tags.push_back(token);
+                }
             }
         }
     }
@@ -98,16 +104,14 @@ std::tuple<HatenaBookmark, HatenaBookmarkResult> HatenaBookmarkClient::post_book
 
     std::map<std::string, std::string> body_params;
     body_params["url"] = url;
-    if (!comment.empty()) {
-        body_params["comment"] = comment;
+    // はてなはタグを comment 先頭の [tag1][tag2] 記法で受け取る
+    std::string formatted_comment;
+    for (const auto& tag : tags) {
+        formatted_comment += '[' + tag + ']';
     }
-    if (!tags.empty()) {
-        std::string tags_str;
-        for (const auto& tag : tags) {
-            if (!tags_str.empty()) tags_str += ' ';
-            tags_str += tag;
-        }
-        body_params["tags"] = tags_str;
+    formatted_comment += comment;
+    if (!formatted_comment.empty()) {
+        body_params["comment"] = formatted_comment;
     }
 
     const std::string auth_header =

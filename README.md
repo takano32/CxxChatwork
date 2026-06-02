@@ -142,6 +142,8 @@ oauth.authorize();
 
 いずれも戻り値は `std::tuple<HatenaBookmark, HatenaBookmarkResult>` です。`HatenaBookmarkResult` は `Added`（HTTP 201）/ `Updated`（HTTP 200）/ `Got`（取得）の3値です。
 
+タグははてなの仕様に合わせ、コメント先頭に `[tag1][tag2]本文` の記法で埋め込んで送信します。`get_bookmark()` で取得する際は、`comment`（タグ記法を除いた本文）と `tags`（配列）に分解して返します。取得したタグ要素に空白が含まれる場合は個別のタグに分割します。
+
 ```cpp
 chatwork::OAuth oauth(consumer_key, consumer_secret);
 oauth.authorize();
@@ -164,12 +166,12 @@ auto [got, _] = client.get_bookmark("https://example.com");
 ブックマークが追加・更新・取得されると、標準出力に次の形式で表示されます。
 
 ```text
-[ADD] [], https://example.com/docs,
-[UPDATE] [tech][cpp], https://github.com/takano32/brevaluck/pulls, 参考資料
-[GET] [tech][cpp], https://example.com, 参考資料
+[ADD]: [] https://example.com/docs #
+[UPDATE]: [tech][cpp] https://github.com/takano32/brevaluck/pulls # 参考資料
+[GET]: [tech][cpp] https://example.com # 参考資料
 ```
 
-形式は `[ラベル] [タグ1][タグ2], URL, コメント` です。
+形式は `[メソッド]: [タグ1][タグ2] URL # コメント` です（タグが無い場合は `[]`）。
 
 ## 動作確認
 
