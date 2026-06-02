@@ -250,3 +250,53 @@ sudo systemctl restart cxx-chatwork
 ```
 
 撤去する場合は `make uninstall-service` を実行します。
+
+## Caddy で HTTPS 公開
+
+Slack の Outgoing Webhook は HTTPS の URL を要求します。[Caddy](https://caddyserver.com/) をリバースプロキシとして前段に置くと、Let's Encrypt の証明書取得・更新まで自動で行われます。本サーバーは `CXX_CHATWORK_LISTEN=127.0.0.1` でローカルのみ待ち受けにし、外部公開は Caddy(443) 経由のみとするのが安全です。
+
+### 前提
+
+- **ドメイン名**が必要です。独自ドメインの A レコードをサーバーの外部 IP に向けます。ドメインが無い場合は `<IPをハイフン区切り>.sslip.io`（例 `203-0-113-10.sslip.io`）が DNS 設定なしで IP に解決されるので利用できます。
+- 証明書取得（ACME チャレンジ）のため **80 / 443 番ポートを開放**します。アプリのポート（`CXX_CHATWORK_PORT`）は外部に開ける必要はありません。
+
+### インストールと設定
+
+Caddy を公式 apt リポジトリから入れます（Debian / Ubuntu）。
+
+```sh
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl gnupg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update && sudo apt-get install -y caddy
+```
+
+`/etc/caddy/Caddyfile` を次の内容にします（`<ドメイン>` は実際のホスト名に置き換え）。webhook の `/cxx_chatwork` だけをアプリへ転送し、それ以外のパスは 404 を返します。
+
+```caddyfile
+<ドメイン> {
+	handle /cxx_chatwork {
+		reverse_proxy localhost:48080
+	}
+	handle {
+		respond 404
+	}
+}
+```
+
+設定を検証して反映します。
+
+```sh
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+### 自動 HTTPS について
+
+Caddyfile のサイトアドレスに実ドメイン名を書くだけで、Caddy の自動 HTTPS が有効になります。Let's Encrypt 固有の設定は不要で、Caddy が起動時に ACME 経由で証明書を取得し、期限が近づくと自動更新します。取得した証明書とアカウント情報は `/var/lib/caddy/.local/share/caddy/` 配下に保存されます。
+
+### Slack 側の設定
+
+Slack の Outgoing Webhook の URL に `https://<ドメイン>/cxx_chatwork` を設定します。
