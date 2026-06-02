@@ -46,6 +46,12 @@ Config::Config() {
     if (token_secret_env != nullptr && *token_secret_env != '\0') {
         _hatena_access_token_secret = token_secret_env;
     }
+
+    const char* slack_token_env = std::getenv("SLACK_OUTGOING_TOKEN");
+    if (slack_token_env == nullptr || *slack_token_env == '\0') {
+        throw std::runtime_error("SLACK_OUTGOING_TOKEN is required");
+    }
+    _slack_outgoing_token = slack_token_env;
 }
 
 std::uint16_t Config::listen_port() const { return _listen_port; }
@@ -54,5 +60,6 @@ const std::string& Config::hatena_consumer_key() const { return _hatena_consumer
 const std::string& Config::hatena_consumer_secret() const { return _hatena_consumer_secret; }
 const std::string& Config::hatena_access_token() const { return _hatena_access_token; }
 const std::string& Config::hatena_access_token_secret() const { return _hatena_access_token_secret; }
+const std::string& Config::slack_outgoing_token() const { return _slack_outgoing_token; }
 
 } // namespace chatwork

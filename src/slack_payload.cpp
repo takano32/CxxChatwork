@@ -1,59 +1,61 @@
 #include "slack_payload.hpp"
 
-#include <exception>
+#include <cstdlib>
+#include <unordered_map>
 
 namespace chatwork {
 namespace {
 
-std::optional<std::string> string_at(const JSON& node, std::string_view key) {
-    if (node.is_object() && node.contains(key)) {
-        const JSON& value = node.at(key);
-        if (value.is_string()) {
-            return value.string();
+std::string url_decode(std::string_view s) {
+    std::string result;
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '%' && i + 2 < s.size()) {
+            const char hex[3] = {s[i + 1], s[i + 2], '\0'};
+            result += static_cast<char>(std::strtol(hex, nullptr, 16));
+            i += 2;
+        } else if (s[i] == '+') {
+            result += ' ';
+        } else {
+            result += s[i];
         }
     }
-    return std::nullopt;
+    return result;
 }
 
-std::optional<std::string> value_under(const JSON& root, std::string_view container,
-                                       std::string_view key) {
-    if (root.is_object() && root.contains(container)) {
-        return string_at(root.at(container), key);
+std::unordered_map<std::string, std::string> parse_form(std::string_view body) {
+    std::unordered_map<std::string, std::string> fields;
+    std::size_t pos = 0;
+    while (pos < body.size()) {
+        const std::size_t amp = body.find('&', pos);
+        const std::string_view pair =
+            body.substr(pos, amp == std::string_view::npos ? std::string_view::npos : amp - pos);
+        const std::size_t eq = pair.find('=');
+        if (eq != std::string_view::npos) {
+            fields.insert_or_assign(url_decode(pair.substr(0, eq)), url_decode(pair.substr(eq + 1)));
+        }
+        if (amp == std::string_view::npos) break;
+        pos = amp + 1;
     }
-    return std::nullopt;
+    return fields;
 }
 
-JSON parse_body(std::string_view body) {
-    try {
-        return JSON::parse(body);
-    } catch (const std::exception&) {
-        return JSON();
-    }
+std::string field_or_empty(const std::unordered_map<std::string, std::string>& fields,
+                           const std::string& key) {
+    const auto it = fields.find(key);
+    return it != fields.end() ? it->second : std::string{};
 }
 
 } // namespace
 
-SlackPayload::SlackPayload(std::string_view body) : _body(body) {
-    const JSON json = parse_body(body);
-
-    _challenge = string_at(json, "challenge");
-
-    // text フィールドが無ければ body 全体を対象とする
-    _text = value_under(json, "event", "text")
-                .or_else([&] { return value_under(json, "message", "text"); })
-                .or_else([&] { return string_at(json, "text"); })
-                .value_or(_body);
-
-    // 送信者が無ければ空文字列
-    _user_id = value_under(json, "event", "user")
-                   .or_else([&] { return value_under(json, "message", "user"); })
-                   .or_else([&] { return string_at(json, "user"); })
-                   .value_or(std::string{});
+SlackPayload::SlackPayload(std::string_view body) {
+    const auto fields = parse_form(body);
+    _text = field_or_empty(fields, "text");
+    _user_id = field_or_empty(fields, "user_id");
+    _token = field_or_empty(fields, "token");
 }
 
-const std::string& SlackPayload::body() const { return _body; }
-const std::optional<std::string>& SlackPayload::challenge() const { return _challenge; }
 const std::string& SlackPayload::text() const { return _text; }
 const std::string& SlackPayload::user_id() const { return _user_id; }
+const std::string& SlackPayload::token() const { return _token; }
 
 } // namespace chatwork

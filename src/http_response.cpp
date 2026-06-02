@@ -32,4 +32,24 @@ void HttpResponse::ok(int fd, std::string_view body) {
     send_all(fd, response);
 }
 
+void HttpResponse::unauthorized(int fd, std::string_view body) {
+    const std::string response =
+        "HTTP/1.1 401 Unauthorized\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "Content-Length: " + std::to_string(body.size()) + "\r\n"
+        "Connection: close\r\n"
+        "\r\n" + std::string(body);
+    send_all(fd, response);
+}
+
+void HttpResponse::not_found(int fd, std::string_view body) {
+    const std::string response =
+        "HTTP/1.1 404 Not Found\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "Content-Length: " + std::to_string(body.size()) + "\r\n"
+        "Connection: close\r\n"
+        "\r\n" + std::string(body);
+    send_all(fd, response);
+}
+
 } // namespace chatwork

@@ -24,7 +24,8 @@ int main() {
 
         chatwork::HatenaBookmarkClient client(std::move(oauth));
 
-        chatwork::Server server(std::move(client), config.listen_address(), config.listen_port());
+        chatwork::Server server(std::move(client), config.slack_outgoing_token(),
+                                config.listen_address(), config.listen_port());
 
         std::cout << "Listening on " << config.listen_address() << ":" << config.listen_port() << std::endl;
 

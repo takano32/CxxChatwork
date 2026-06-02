@@ -13,6 +13,7 @@ public:
     const std::string& hatena_consumer_secret() const;
     const std::string& hatena_access_token() const;
     const std::string& hatena_access_token_secret() const;
+    const std::string& slack_outgoing_token() const;
 
 private:
     std::uint16_t _listen_port;
@@ -21,6 +22,7 @@ private:
     std::string _hatena_consumer_secret;
     std::string _hatena_access_token;
     std::string _hatena_access_token_secret;
+    std::string _slack_outgoing_token;
 };
 
 } // namespace chatwork

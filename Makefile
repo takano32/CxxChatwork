@@ -1,7 +1,8 @@
-.PHONY: help configure build run rebuild clean test-webhook test-challenge test-uri test-get \
+.PHONY: help configure build run rebuild clean test-webhook test-uri test-get \
 	install-service uninstall-service service-status service-logs
 
 LISTEN ?=
+TOKEN ?= test-token
 
 BUILD_DIR ?= build
 PORT ?= 48080
@@ -19,9 +20,8 @@ help:
 		'  make clean           Remove build artifacts' \
 		'  make rebuild         Clean, configure, and build' \
 		'  make configure       Generate CMake build files' \
-		'  make test-webhook    POST a Slack message containing URLs to the running server' \
-		'  make test-challenge  POST a Slack URL verification payload' \
-		'  make test-uri        POST a Slack message with multiple URLs to the running server' \
+		'  make test-webhook    POST a Slack Outgoing Webhook payload containing a URL' \
+		'  make test-uri        POST a Slack Outgoing Webhook payload with multiple URLs' \
 		'  make test-get        GET a bookmark for a URL from the running server' \
 		'  make install-service Install and reload the systemd unit (uses sudo)' \
 		'  make uninstall-service Stop, disable and remove the systemd unit (uses sudo)' \
@@ -30,6 +30,7 @@ help:
 		'' \
 		'Variables:' \
 		'  PORT=48080           Port used by run and test targets' \
+		'  TOKEN=test-token     Slack Outgoing Webhook token used by run and test targets' \
 		'  BUILD_DIR=build      CMake build directory'
 
 configure:
@@ -39,7 +40,7 @@ build: configure
 	cmake --build $(BUILD_DIR)
 
 run: build
-	CXX_CHATWORK_PORT=$(PORT) CXX_CHATWORK_LISTEN=$(LISTEN) $(BINARY)
+	CXX_CHATWORK_PORT=$(PORT) CXX_CHATWORK_LISTEN=$(LISTEN) SLACK_OUTGOING_TOKEN=$(TOKEN) $(BINARY)
 
 rebuild: clean build
 
@@ -47,19 +48,16 @@ clean:
 	cmake -E remove_directory $(BUILD_DIR)
 
 test-webhook:
-	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
-		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","user":"U07TAKANO32","text":"PR を確認してください https://github.com/takano32/brevaluck/pulls"}}'
-
-test-challenge:
-	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
-		-H 'Content-Type: application/json' \
-		--data '{"type":"url_verification","challenge":"challenge-token"}'
+	curl -sS -i -X POST http://127.0.0.1:$(PORT)/cxx_chatwork \
+		--data-urlencode 'token=$(TOKEN)' \
+		--data-urlencode 'user_id=U07TAKANO32' \
+		--data-urlencode 'text=PR を確認してください https://github.com/takano32/brevaluck/pulls'
 
 test-uri:
-	curl -sS -i -X POST http://127.0.0.1:$(PORT)/slack \
-		-H 'Content-Type: application/json' \
-		--data '{"event":{"type":"message","user":"U07TAKANO32","text":"参考: https://github.com/takano32/brevaluck/ と https://developer.hatena.ne.jp/ を見てください。"}}'
+	curl -sS -i -X POST http://127.0.0.1:$(PORT)/cxx_chatwork \
+		--data-urlencode 'token=$(TOKEN)' \
+		--data-urlencode 'user_id=U07TAKANO32' \
+		--data-urlencode 'text=参考: https://github.com/takano32/brevaluck/ と https://developer.hatena.ne.jp/ を見てください。'
 
 test-get:
 	curl -sS -i -G http://127.0.0.1:$(PORT)/bookmark \

@@ -71,9 +71,10 @@ void install_signal_handlers() {
 }
 
 Server::Server(HatenaBookmarkClient client,
+               std::string slack_token,
                const std::string& listen_address,
                std::uint16_t listen_port)
-    : _client(std::move(client)) {
+    : _client(std::move(client)), _slack_token(std::move(slack_token)) {
     Socket s(::socket(AF_INET, SOCK_STREAM, 0));
     if (s.get() < 0) {
         throw std::runtime_error(std::format("socket failed: {}", std::strerror(errno)));
@@ -110,16 +111,23 @@ void Server::handle_client(int client_fd) {
         return;
     }
 
-    const SlackPayload payload(request.body());
-
-    if (const auto& challenge = payload.challenge()) {
-        HttpResponse::ok(client_fd, *challenge);
+    // POST は webhook エンドポイント /cxx_chatwork のみ受け付ける
+    const std::string_view target = request.target();
+    if (target.substr(0, target.find('?')) != "/cxx_chatwork") {
+        HttpResponse::not_found(client_fd);
         return;
     }
 
-    const auto& text = payload.text();
+    const SlackPayload payload(request.body());
+
+    // Outgoing Webhook の token を検証する
+    if (payload.token() != _slack_token) {
+        HttpResponse::unauthorized(client_fd);
+        return;
+    }
+
     const auto& user_id = payload.user_id();
-    for (const auto& url : URI::extract_url(text)) {
+    for (const auto& url : URI::extract_url(payload.text())) {
         // 既存のブックマークがあれば comment/tags を引き継いで上書き消失を防ぐ
         std::string comment;
         std::vector<std::string> tags;
