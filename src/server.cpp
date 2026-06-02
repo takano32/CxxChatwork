@@ -69,10 +69,10 @@ void install_signal_handlers() {
     }
 }
 
-Server::Server(std::vector<std::unique_ptr<HatenaClient>> clients,
+Server::Server(HatenaBookmarkClient client,
                const std::string& listen_address,
                std::uint16_t listen_port)
-    : _clients(std::move(clients)) {
+    : _client(std::move(client)) {
     Socket s(::socket(AF_INET, SOCK_STREAM, 0));
     if (s.get() < 0) {
         throw std::runtime_error(std::format("socket failed: {}", std::strerror(errno)));
@@ -118,9 +118,17 @@ void Server::handle_client(int client_fd) {
 
     const auto text = payload.text().value_or(std::string(request.body()));
     for (const auto& url : URI::extract_url(text)) {
-        for (const auto& client : _clients) {
-            client->process(url);
+        // 既存のブックマークがあれば comment/tags を引き継いで上書き消失を防ぐ
+        std::string comment;
+        std::vector<std::string> tags;
+        try {
+            const auto existing = std::get<0>(_client.get_bookmark(url));
+            comment = existing.comment();
+            tags = existing.tags();
+        } catch (const std::exception&) {
+            // 未ブックマークなどで取得できない場合は新規として登録する
         }
+        _client.post_bookmark(url, comment, tags);
     }
 
     HttpResponse::ok(client_fd);
@@ -138,21 +146,14 @@ void Server::handle_get(int client_fd, std::string_view target) {
         return;
     }
 
-    for (const auto& client : _clients) {
-        if (auto* bookmark_client = dynamic_cast<HatenaBookmarkClient*>(client.get())) {
-            const auto [bookmark, result] = bookmark_client->get_bookmark(url);
-            std::string joined_tags;
-            for (const auto& tag : bookmark.tags()) {
-                joined_tags += '[' + tag + ']';
-            }
-            HttpResponse::ok(client_fd,
-                             std::format("{}, {}, {}\n", joined_tags, bookmark.url(),
-                                         bookmark.comment()));
-            return;
-        }
+    const auto [bookmark, result] = _client.get_bookmark(url);
+    std::string joined_tags;
+    for (const auto& tag : bookmark.tags()) {
+        joined_tags += '[' + tag + ']';
     }
-
-    HttpResponse::ok(client_fd);
+    HttpResponse::ok(
+        client_fd,
+        std::format("{}, {}, {}\n", joined_tags, bookmark.url(), bookmark.comment()));
 }
 
 void Server::run() {

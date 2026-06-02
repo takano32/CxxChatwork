@@ -12,7 +12,6 @@ enum class HatenaBookmarkResult { Added, Updated, Got };
 class HatenaBookmarkClient : public HatenaClient {
 public:
     using HatenaClient::HatenaClient;
-    void process(const std::string& url) override;
     std::tuple<HatenaBookmark, HatenaBookmarkResult> post_bookmark(
         const std::string& url,
         const std::string& comment = {},

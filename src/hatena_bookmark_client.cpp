@@ -89,13 +89,6 @@ HatenaBookmark parse_bookmark(const std::string& url, const std::string& respons
 
 } // namespace
 
-void HatenaBookmarkClient::process(const std::string& url) {
-    const auto [bookmark, result] = post_bookmark(url);
-    std::cout << format_bookmark_line(result_label(result), bookmark.url(),
-                                      bookmark.comment(), bookmark.tags())
-              << std::endl;
-}
-
 std::tuple<HatenaBookmark, HatenaBookmarkResult> HatenaBookmarkClient::post_bookmark(
     const std::string& url,
     const std::string& comment,
@@ -154,7 +147,11 @@ std::tuple<HatenaBookmark, HatenaBookmarkResult> HatenaBookmarkClient::post_book
 
     const auto result =
         http_code == 201 ? HatenaBookmarkResult::Added : HatenaBookmarkResult::Updated;
-    return {parse_bookmark(url, response_body), result};
+    HatenaBookmark bookmark = parse_bookmark(url, response_body);
+    std::cout << format_bookmark_line(result_label(result), bookmark.url(), bookmark.comment(),
+                                      bookmark.tags())
+              << std::endl;
+    return {std::move(bookmark), result};
 }
 
 std::tuple<HatenaBookmark, HatenaBookmarkResult> HatenaBookmarkClient::get_bookmark(

@@ -73,7 +73,9 @@ CXX_CHATWORK_PORT=48080 CXX_CHATWORK_LISTEN=127.0.0.1 ./build/cxx_chatwork
 2. `message.text`
 3. トップレベルの `text`
 
-見つかったテキストから `URI::extract_url()` で URL を抽出し、登録済みの全クライアントの `process()` を呼び出します。抽出対象は `http` / `https` スキームの URL のみです。JSON のパースは自前の `JSON` クラス（`JSON::parse`）で行います。
+見つかったテキストから `URI::extract_url()` で URL を抽出します。抽出対象は `http` / `https` スキームの URL のみです。JSON のパースは自前の `JSON` クラス（`JSON::parse`）で行います。
+
+抽出した各 URL について、まず `get_bookmark()` で既存のブックマークを取得し、その `comment` と `tags` を引き継いだうえで `post_bookmark()` を呼び出します。これにより、既存のコメント・タグが上書きで消えるのを防ぎます。まだブックマークされていない URL は取得に失敗するため、新規として登録します。
 
 ## Slack URL verification
 
@@ -92,7 +94,7 @@ HTTP レスポンス本文として `challenge-token` を返します。
 
 ## ブックマーク取得エンドポイント
 
-`GET /bookmark?url=...` で、指定した URL のブックマーク情報を取得できます。サーバーは登録済みクライアントから `HatenaBookmarkClient` を探して `get_bookmark()` を呼び出し、レスポンス本文に `[タグ1][タグ2], URL, コメント` の形式で結果を返します。
+`GET /bookmark?url=...` で、指定した URL のブックマーク情報を取得できます。サーバーは `HatenaBookmarkClient::get_bookmark()` を呼び出し、レスポンス本文に `[タグ1][タグ2], URL, コメント` の形式で結果を返します。
 
 ```sh
 curl -sS -G http://127.0.0.1:48080/bookmark \
@@ -104,13 +106,13 @@ curl -sS -G http://127.0.0.1:48080/bookmark \
 ### クラス構成
 
 ```
-HatenaClient           (純粋仮想 process(url) を持つベースクラス)
+HatenaClient           (OAuth を保持するベースクラス)
   └─ HatenaBookmarkClient  (post_bookmark / get_bookmark を実装)
 
 HatenaBookmark         (url, comment, tags を保持する値クラス)
 ```
 
-`Server` は `HatenaClient` の配列を持ち、抽出した URL ごとに全クライアントの `process()` を呼び出します。
+`Server` は `HatenaBookmarkClient` を1つ保持し、抽出した URL ごとに `get_bookmark()` と `post_bookmark()` を直接呼び出します。
 
 ### OAuth 認証
 

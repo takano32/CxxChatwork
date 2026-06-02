@@ -4,9 +4,7 @@
 #include "server.hpp"
 
 #include <iostream>
-#include <memory>
 #include <stdexcept>
-#include <vector>
 
 int main() {
     try {
@@ -24,10 +22,9 @@ int main() {
             std::cout << "HATENA_ACCESS_TOKEN_SECRET=" << oauth.token_secret() << std::endl;
         }
 
-        std::vector<std::unique_ptr<chatwork::HatenaClient>> clients;
-        clients.push_back(std::make_unique<chatwork::HatenaBookmarkClient>(std::move(oauth)));
+        chatwork::HatenaBookmarkClient client(std::move(oauth));
 
-        chatwork::Server server(std::move(clients), config.listen_address(), config.listen_port());
+        chatwork::Server server(std::move(client), config.listen_address(), config.listen_port());
 
         std::cout << "Listening on " << config.listen_address() << ":" << config.listen_port() << std::endl;
 
