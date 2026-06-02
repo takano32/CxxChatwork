@@ -55,17 +55,51 @@ std::string format_bookmark_line(std::string_view label,
     return std::format("{} [{}], {}, {}", label, joined_tags, url, comment);
 }
 
+std::string_view result_label(HatenaBookmarkResult result) {
+    switch (result) {
+    case HatenaBookmarkResult::Added:   return "[ADD]";
+    case HatenaBookmarkResult::Updated: return "[UPDATE]";
+    case HatenaBookmarkResult::Got:     return "[GET]";
+    }
+    return "[?]";
+}
+
+HatenaBookmark parse_bookmark(const std::string& url, const std::string& response_body) {
+    const JSON json = JSON::parse(response_body);
+
+    std::string comment;
+    if (json.contains("comment") && json.at("comment").is_string()) {
+        comment = json.at("comment").string();
+    }
+
+    std::vector<std::string> tags;
+    if (json.contains("tags") && json.at("tags").is_array()) {
+        const auto& array = json.at("tags").array();
+        const bool all_strings = std::all_of(array.begin(), array.end(),
+                                              [](const JSON& tag) { return tag.is_string(); });
+        if (all_strings) {
+            for (const auto& tag : array) {
+                tags.push_back(tag.string());
+            }
+        }
+    }
+
+    return HatenaBookmark(url, std::move(comment), std::move(tags));
+}
+
 } // namespace
 
 void HatenaBookmarkClient::process(const std::string& url) {
-    const auto result = post_bookmark(url);
-    const auto label = (result == BookmarkResult::Added) ? "[ADD]" : "[UPDATE]";
-    std::cout << format_bookmark_line(label, url, {}, {}) << std::endl;
+    const auto [bookmark, result] = post_bookmark(url);
+    std::cout << format_bookmark_line(result_label(result), bookmark.url(),
+                                      bookmark.comment(), bookmark.tags())
+              << std::endl;
 }
 
-BookmarkResult HatenaBookmarkClient::post_bookmark(const std::string& url,
-                                                    const std::string& comment,
-                                                    const std::vector<std::string>& tags) {
+std::tuple<HatenaBookmark, HatenaBookmarkResult> HatenaBookmarkClient::post_bookmark(
+    const std::string& url,
+    const std::string& comment,
+    const std::vector<std::string>& tags) {
     constexpr std::string_view endpoint =
         "https://bookmark.hatenaapis.com/rest/1/my/bookmark";
 
@@ -118,10 +152,13 @@ BookmarkResult HatenaBookmarkClient::post_bookmark(const std::string& url,
             std::format("bookmark API error: HTTP {} {}", http_code, response_body));
     }
 
-    return http_code == 201 ? BookmarkResult::Added : BookmarkResult::Updated;
+    const auto result =
+        http_code == 201 ? HatenaBookmarkResult::Added : HatenaBookmarkResult::Updated;
+    return {parse_bookmark(url, response_body), result};
 }
 
-HatenaBookmark HatenaBookmarkClient::get_bookmark(const std::string& url) {
+std::tuple<HatenaBookmark, HatenaBookmarkResult> HatenaBookmarkClient::get_bookmark(
+    const std::string& url) {
     constexpr std::string_view endpoint =
         "https://bookmark.hatenaapis.com/rest/1/my/bookmark";
 
@@ -160,28 +197,12 @@ HatenaBookmark HatenaBookmarkClient::get_bookmark(const std::string& url) {
             std::format("bookmark API error: HTTP {} {}", http_code, response_body));
     }
 
-    const JSON json = JSON::parse(response_body);
+    HatenaBookmark bookmark = parse_bookmark(url, response_body);
+    std::cout << format_bookmark_line(result_label(HatenaBookmarkResult::Got), bookmark.url(),
+                                      bookmark.comment(), bookmark.tags())
+              << std::endl;
 
-    std::string comment;
-    if (json.contains("comment") && json.at("comment").is_string()) {
-        comment = json.at("comment").string();
-    }
-
-    std::vector<std::string> tags;
-    if (json.contains("tags") && json.at("tags").is_array()) {
-        const auto& array = json.at("tags").array();
-        const bool all_strings = std::all_of(array.begin(), array.end(),
-                                              [](const JSON& tag) { return tag.is_string(); });
-        if (all_strings) {
-            for (const auto& tag : array) {
-                tags.push_back(tag.string());
-            }
-        }
-    }
-
-    std::cout << format_bookmark_line("[GET]", url, comment, tags) << std::endl;
-
-    return HatenaBookmark(url, std::move(comment), std::move(tags));
+    return {std::move(bookmark), HatenaBookmarkResult::Got};
 }
 
 } // namespace chatwork
