@@ -38,6 +38,9 @@ public:
 
     bool contains(std::string_view key) const;
     const JSON& at(std::string_view key) const;
+    const JSON& at(std::size_t index) const;
+
+    operator const std::string&() const;
 
 private:
     Value _value;

@@ -242,4 +242,10 @@ const JSON& JSON::at(std::string_view key) const {
     return it->second;
 }
 
+const JSON& JSON::at(std::size_t index) const {
+    return std::get<Array>(_value).at(index);
+}
+
+JSON::operator const std::string&() const { return std::get<std::string>(_value); }
+
 } // namespace chatwork
