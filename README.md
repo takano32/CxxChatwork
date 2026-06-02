@@ -215,6 +215,10 @@ make test-get PORT=48080
 | `make test-challenge PORT=48080` | 起動中のサーバーへ Slack URL verification payload を POST します。 |
 | `make test-uri PORT=48080` | 起動中のサーバーへ複数の URL を含む Slack メッセージ payload を POST します。 |
 | `make test-get PORT=48080` | 起動中のサーバーへ `GET /bookmark?url=...` を送り、ブックマーク情報を取得します。 |
+| `make install-service` | systemd ユニットを生成・設置して reload します（`sudo` を使用）。 |
+| `make uninstall-service` | systemd ユニットを停止・無効化して削除します（`sudo` を使用）。 |
+| `make service-status` | systemd サービスの状態を表示します。 |
+| `make service-logs` | systemd サービスのログを追従表示します。 |
 
 ## Makefile の変数
 
@@ -228,3 +232,41 @@ make test-get PORT=48080
 
 サーバーはフォアグラウンドで動作します。
 終了するには `Ctrl-C` を押してください。
+
+## systemd でのデプロイ
+
+サーバーを常駐させ、`systemctl` で制御するための systemd ユニットを `deploy/cxx-chatwork.service` に用意しています。`make install-service` が、その時点の**実行ユーザー**と**作業ディレクトリ**を埋め込んで `/etc/systemd/system/cxx-chatwork.service` を生成します。
+
+### 事前準備
+
+1. ビルド済みであること（`./build/cxx_chatwork` が存在）。無ければ `make build` を実行します。
+2. `.env` を作業ディレクトリに配置していること。systemd の `EnvironmentFile` として読み込まれます。
+   - **`HATENA_ACCESS_TOKEN` / `HATENA_ACCESS_TOKEN_SECRET` を必ず設定してください。** これらが無いと起動時に OAuth の PIN 入力を待ちますが、systemd 配下では標準入力が無いため起動に失敗します。
+   - 外部（Slack）から受信する場合は `CXX_CHATWORK_LISTEN=0.0.0.0` とし、ファイアウォール／セキュリティグループで `CXX_CHATWORK_PORT` を開放します。
+
+### 設置と起動
+
+```sh
+cd ~/CxxChatwork
+make build              # まだビルドしていなければ
+make install-service    # ユニットを生成・設置（sudo）
+sudo systemctl enable --now cxx-chatwork
+```
+
+### 運用
+
+```sh
+make service-status                 # 状態確認（systemctl status cxx-chatwork）
+make service-logs                   # ログ追従（journalctl -u cxx-chatwork -f）
+sudo systemctl restart cxx-chatwork # 再起動
+```
+
+更新を反映するには、リポジトリを更新してビルドし直し、サービスを再起動します。
+
+```sh
+git pull
+make build
+sudo systemctl restart cxx-chatwork
+```
+
+撤去する場合は `make uninstall-service` を実行します。

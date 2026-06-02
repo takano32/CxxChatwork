@@ -1,0 +1,18 @@
+[Unit]
+Description=CxxChatwork Slack webhook to Hatena Bookmark
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKDIR__
+EnvironmentFile=__WORKDIR__/.env
+ExecStart=__WORKDIR__/build/cxx_chatwork
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
