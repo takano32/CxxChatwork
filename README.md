@@ -39,13 +39,19 @@ cmake --build build
 | `CXX_CHATWORK_LISTEN` | — | 待受アドレス。省略時は `0.0.0.0` |
 | `HATENA_CONSUMER_KEY` | ✓ | はてな OAuth の consumer key |
 | `HATENA_CONSUMER_SECRET` | ✓ | はてな OAuth の consumer secret |
+| `HATENA_ACCESS_TOKEN` | — | はてな OAuth のアクセストークン。設定すると OAuth フローを省略します |
+| `HATENA_ACCESS_TOKEN_SECRET` | — | アクセストークンシークレット。`HATENA_ACCESS_TOKEN` と対で指定します |
 
-起動時に OAuth 認証フローが始まります。表示された URL をブラウザで開いてアプリを認可し、発行された PIN を入力してください。
+`.env.example` に設定例があります。
+
+`HATENA_ACCESS_TOKEN` が未設定の場合、起動時に OAuth 認証フローが始まります。表示された URL をブラウザで開いてアプリを認可し、発行された PIN を入力してください。初回認証で得られたトークンが標準出力に表示されるので、それを `HATENA_ACCESS_TOKEN` / `HATENA_ACCESS_TOKEN_SECRET` に設定すれば、次回以降は PIN 入力を省略できます。
 
 ```sh
 make run PORT=48080
 # => Authorize at: https://www.hatena.com/oauth/authorize?oauth_token=...
 # => Enter PIN: xxxxxx
+# => HATENA_ACCESS_TOKEN=...
+# => HATENA_ACCESS_TOKEN_SECRET=...
 # => Listening on 0.0.0.0:48080
 ```
 
@@ -67,7 +73,7 @@ CXX_CHATWORK_PORT=48080 CXX_CHATWORK_LISTEN=127.0.0.1 ./build/cxx_chatwork
 2. `message.text`
 3. トップレベルの `text`
 
-見つかったテキストから URL を抽出し、登録済みの全クライアントの `process()` を呼び出します。
+見つかったテキストから `URI::extract_url()` で URL を抽出し、登録済みの全クライアントの `process()` を呼び出します。抽出対象は `http` / `https` スキームの URL のみです。JSON のパースは自前の `JSON` クラス（`JSON::parse`）で行います。
 
 ## Slack URL verification
 
@@ -84,16 +90,27 @@ Slack Events API の URL verification payload に含まれる `challenge` に対
 
 HTTP レスポンス本文として `challenge-token` を返します。
 
+## ブックマーク取得エンドポイント
+
+`GET /bookmark?url=...` で、指定した URL のブックマーク情報を取得できます。サーバーは登録済みクライアントから `HatenaBookmarkClient` を探して `get_bookmark()` を呼び出し、レスポンス本文に `[タグ1][タグ2], URL, コメント` の形式で結果を返します。
+
+```sh
+curl -sS -G http://127.0.0.1:48080/bookmark \
+  --data-urlencode 'url=https://github.com/takano32/brevaluck/'
+```
+
 ## はてなブックマーク連携
 
 ### クラス構成
 
 ```
-HatenaClient           (純粋仮想 process(uri) を持つベースクラス)
-  └─ HatenaBookmarkClient  (post_bookmark を実装)
+HatenaClient           (純粋仮想 process(url) を持つベースクラス)
+  └─ HatenaBookmarkClient  (post_bookmark / get_bookmark を実装)
+
+HatenaBookmark         (url, comment, tags を保持する値クラス)
 ```
 
-`Server` は `HatenaClient` の配列を持ち、抽出した URI ごとに全クライアントの `process()` を呼び出します。
+`Server` は `HatenaClient` の配列を持ち、抽出した URL ごとに全クライアントの `process()` を呼び出します。
 
 ### OAuth 認証
 
@@ -112,9 +129,11 @@ oauth.authorize();
 3. 標準入力から PIN を受け取る
 4. アクセストークンに交換して内部に保持
 
-### ブックマークの追加・更新
+### ブックマークの追加・更新・取得
 
-`HatenaBookmarkClient` の `post_bookmark(url, comment, tags)` でブックマークを追加または更新します。`comment` と `tags` は省略できます。
+`HatenaBookmarkClient` の `post_bookmark(url, comment, tags)` でブックマークを追加または更新し、`get_bookmark(url)` でブックマーク情報を取得します。`comment` と `tags` は省略できます。
+
+いずれも戻り値は `std::tuple<HatenaBookmark, HatenaBookmarkResult>` です。`HatenaBookmarkResult` は `Added`（HTTP 201）/ `Updated`（HTTP 200）/ `Got`（取得）の3値です。
 
 ```cpp
 chatwork::OAuth oauth(consumer_key, consumer_secret);
@@ -122,21 +141,28 @@ oauth.authorize();
 chatwork::HatenaBookmarkClient client(std::move(oauth));
 
 // URL のみ
-client.post_bookmark("https://example.com");
+auto [bookmark, result] = client.post_bookmark("https://example.com");
 
 // コメント付き
 client.post_bookmark("https://example.com", "参考資料");
 
 // コメントとタグ付き
 client.post_bookmark("https://example.com", "参考資料", {"tech", "cpp"});
+
+// 取得
+auto [got, _] = client.get_bookmark("https://example.com");
+// got.url(), got.comment(), got.tags()
 ```
 
-Webhook 経由でブックマークが追加・更新されると、標準出力に次のように表示されます。
+ブックマークが追加・更新・取得されると、標準出力に次の形式で表示されます。
 
 ```text
-[ADD] https://example.com/docs
-[UPDATE] https://github.com/takano32/brevaluck/pulls
+[ADD] [], https://example.com/docs,
+[UPDATE] [tech][cpp], https://github.com/takano32/brevaluck/pulls, 参考資料
+[GET] [tech][cpp], https://example.com, 参考資料
 ```
+
+形式は `[ラベル] [タグ1][タグ2], URL, コメント` です。
 
 ## 動作確認
 
@@ -160,6 +186,12 @@ make test-challenge PORT=48080
 
 レスポンス本文に `challenge-token` が返れば成功です。
 
+ブックマーク取得を確認するには、次を実行します。
+
+```sh
+make test-get PORT=48080
+```
+
 ## Makefile のターゲット
 
 | ターゲット | 説明 |
@@ -173,6 +205,7 @@ make test-challenge PORT=48080
 | `make test-webhook PORT=48080` | 起動中のサーバーへ URL を含む Slack メッセージ payload を POST します。 |
 | `make test-challenge PORT=48080` | 起動中のサーバーへ Slack URL verification payload を POST します。 |
 | `make test-uri PORT=48080` | 起動中のサーバーへ複数の URL を含む Slack メッセージ payload を POST します。 |
+| `make test-get PORT=48080` | 起動中のサーバーへ `GET /bookmark?url=...` を送り、ブックマーク情報を取得します。 |
 
 ## Makefile の変数
 
